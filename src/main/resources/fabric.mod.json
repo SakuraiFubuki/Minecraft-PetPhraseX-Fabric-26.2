@@ -7,10 +7,13 @@
   "authors": [
     "Tapio",
     "Polaris_Light",
-    "HSSkyBoy"
+    "HSSkyBoy",
+    "SakuraiFubuki"
   ],
   "contact": {
-    "sources": "https://github.com/HSSkyBoy/PetPhraseX"
+    "homepage": "https://github.com/SakuraiFubuki/Minecraft-PetPhraseX-Fabric-26.2",
+    "sources": "https://github.com/SakuraiFubuki/Minecraft-PetPhraseX-Fabric-26.2",
+    "issues": "https://github.com/SakuraiFubuki/Minecraft-PetPhraseX-Fabric-26.2/issues"
   },
   "license": "AGPL-3.0",
   "icon": "assets/petphrasex/icon.png",
@@ -30,20 +33,13 @@
     "petphrasex.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=0.18.6",
-    "minecraft": ">=26.1 <26.2",
+    "fabricloader": ">=0.19.3",
+    "minecraft": ">=26.2 <26.3",
     "java": ">=25"
-  },
-  "suggests": {
-    "fabric-api": "*"
   },
   "custom": {
     "modmenu": {
-      "links": {
-        "modmenu.source": "https://github.com/HSSkyBoy/PetPhraseX",
-        "modmenu.modrinth": "https://modrinth.com/mod/petphrasex"
-      },
-      "update_checker": true
+      "update_checker": false
     }
  }
 }

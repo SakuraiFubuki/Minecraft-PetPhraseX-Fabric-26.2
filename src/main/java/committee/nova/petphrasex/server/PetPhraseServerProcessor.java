@@ -1,10 +1,8 @@
 package committee.nova.petphrasex.server;
 
 import committee.nova.petphrasex.config.PetPhraseConfigX;
-import committee.nova.petphrasex.config.PhraseSettings;
-import committee.nova.petphrasex.server.forced.ForcedPhraseData;
-import committee.nova.petphrasex.server.forced.ForcedPhraseManager;
 import committee.nova.petphrasex.util.StringUtil;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 
@@ -13,21 +11,36 @@ public final class PetPhraseServerProcessor {
     }
 
     public static String process(ServerPlayer player, String message) {
-        ForcedPhraseData forcedData = ForcedPhraseManager.getActive(player);
-        if (forcedData != null) {
-            return StringUtil.processMessage(message, forcedData.phraseSettings());
-        }
+        // 服务端口癖只在专用伺服器生效：单人存档 / LAN 由客户端口癖处理，
+        // 如此两条路径互斥，不会对同一则讯息加两次口癖
+        MinecraftServer server = player.level().getServer();
+        if (server == null || !server.isDedicatedServer()) return message;
 
         PetPhraseConfigX config = PetPhraseConfigX.get();
         if (!config.enableServerPhrase) return message;
 
         PetPhraseConfigX.ServerConditionRule rule = getFirstMatchedRule(config, player);
         if (rule != null) {
-            return StringUtil.processMessage(message, rule.phraseSettings(config));
+            return StringUtil.processMessage(
+                    message,
+                    config.ignoreMark,
+                    config.removeIgnoreMark,
+                    rule.prefix,
+                    rule.suffix,
+                    rule.sentencePrefix,
+                    rule.sentenceSuffix
+            );
         }
 
-        PhraseSettings settings = config.phraseSettings();
-        return StringUtil.processMessage(message, settings);
+        return StringUtil.processMessage(
+                message,
+                config.ignoreMark,
+                config.removeIgnoreMark,
+                config.prefix,
+                config.suffix,
+                config.sentencePrefix,
+                config.sentenceSuffix
+        );
     }
 
     private static PetPhraseConfigX.ServerConditionRule getFirstMatchedRule(PetPhraseConfigX config, ServerPlayer player) {

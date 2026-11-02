@@ -1,5 +1,6 @@
 plugins {
-    id 'net.fabricmc.fabric-loom' version '1.16-SNAPSHOT'
+    // 26.x 线用原生 loom（无 -remap 后缀）：26.1 起 Minecraft 不再混淆，无需 remap
+    id 'net.fabricmc.fabric-loom' version '1.17.19'
     id 'maven-publish'
 }
 
@@ -16,10 +17,10 @@ repositories {
 dependencies {
     // To change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    compileOnly "net.fabricmc:fabric-loader:${project.loader_version}"
-    compileOnly "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-    
-    // Mod Menu
+    // 26.x 线依赖走 implementation（1.x 时代才是 mod 依赖配置）；26.x 无混淆，无 mappings 行
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    // Mod Menu（可选软依赖，仅编译期）
     compileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
 
     testImplementation platform("org.junit:junit-bom:5.12.2")
@@ -36,27 +37,18 @@ processResources {
     }
 }
 
+// 目标 Java 版本走 toolchain 声明（缺 JDK 时由 settings.gradle 的 foojay 自动 provision）
 def targetJavaVersion = 25
 tasks.withType(JavaCompile).configureEach {
     // ensure that the encoding is set to UTF-8, no matter what the system default is
-    // this fixes some edge cases with special characters not displaying correctly
-    // see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
-    // If Javadoc is generated, this must be specified in that task too.
     it.options.encoding = "UTF-8"
-    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
-        it.options.release = targetJavaVersion
-    }
 }
 
 java {
-    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
-    if (JavaVersion.current() < javaVersion) {
-        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
-    }
-    // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
-    // if it is present.
-    // If you remove this line, sources will not be generated.
     withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
 }
 
 base {

@@ -1,181 +1,164 @@
 package committee.nova.petphrasex.client;
 
 import committee.nova.petphrasex.config.PetPhraseConfigX;
-import committee.nova.petphrasex.config.PhraseSettings;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 設定画面。版面全部由 {@link ConfigScreenLayout} 依視窗大小計算：視窗縮放或 GUI Scale 變更時
+ * init() 會重跑並重新排版；高度不足時自動切換成緊湊版面，不會有控件掉出畫面。
+ * 文字一律走 {@link PetPhraseLang}（本模組不依賴 Fabric API，模組語系不會被原版載入）。
+ */
 public class PetPhraseConfigScreenX extends Screen {
-    private static final int PANEL_WIDTH = 340;
-    private static final int LABEL_WIDTH = 108;
-    private static final int CONTROL_WIDTH = 220;
-    private static final int ROW_HEIGHT = 28;
+    private static final int ROW_COUNT = 6;
 
     private final Screen parent;
-    private boolean forcedByServer;
-    private boolean removeIgnoreMark;
-    private boolean enableClientPhrase;
+    private final List<Row> rows = new ArrayList<>();
 
     private EditBox ignoreMarkField;
     private EditBox prefixField;
     private EditBox suffixField;
-    private EditBox sentencePrefixField;
-    private EditBox sentenceSuffixField;
-    private Button removeIgnoreMarkButton;
-    private Button enableClientPhraseButton;
-    private Button reclaimButton;
-    private Button doneButton;
-    private Button cancelButton;
+    private EditBox sPrefixField;
+    private EditBox sSuffixField;
+    private boolean removeIgnoreMark;
+
+    private ConfigScreenLayout layout = ConfigScreenLayout.compute(320, 240, ROW_COUNT);
+
+    private static final class Row {
+        final Component label;
+        final int labelY;
+        final boolean centered;
+
+        Row(Component label, int labelY, boolean centered) {
+            this.label = label;
+            this.labelY = labelY;
+            this.centered = centered;
+        }
+    }
 
     public PetPhraseConfigScreenX(Screen parent) {
-        super(Component.translatable("screen.petphrasex.config.title"));
+        super(PetPhraseLang.text("screen.petphrasex.config.title"));
         this.parent = parent;
     }
 
     @Override
     protected void init() {
-        super.init();
-        this.clearWidgets();
+        this.rows.clear();
+        this.layout = ConfigScreenLayout.compute(this.width, this.height, ROW_COUNT);
 
         PetPhraseConfigX config = PetPhraseConfigX.get();
-        this.forcedByServer = ServerForcedPhraseState.isForcedByServer();
         this.removeIgnoreMark = config.removeIgnoreMark;
-        this.enableClientPhrase = config.enableClientPhrase;
 
-        int panelX = (this.width - PANEL_WIDTH) / 2;
-        int labelX = panelX;
-        int controlX = panelX + LABEL_WIDTH + 12;
-        int y = this.forcedByServer ? 64 : 48;
+        this.ignoreMarkField = createField(config.ignoreMark, "screen.petphrasex.config.ignore_mark");
+        addRow(PetPhraseLang.text("screen.petphrasex.config.ignore_mark.desc"), this.ignoreMarkField);
 
-        this.enableClientPhraseButton = this.addRenderableWidget(Button.builder(
-                Component.literal(this.enableClientPhrase ? "客户端口癖：开启" : "客户端口癖：关闭"),
-                button -> {
-                    this.enableClientPhrase = !this.enableClientPhrase;
-                    button.setMessage(Component.literal(this.enableClientPhrase ? "客户端口癖：开启" : "客户端口癖：关闭"));
-                }
-        ).bounds(controlX, y, CONTROL_WIDTH, 20).build());
-        y += ROW_HEIGHT;
+        Button toggle = Button.builder(
+                        this.getRemoveIgnoreMarkButtonText(this.removeIgnoreMark),
+                        button -> {
+                            this.removeIgnoreMark = !this.removeIgnoreMark;
+                            button.setMessage(this.getRemoveIgnoreMarkButtonText(this.removeIgnoreMark));
+                        })
+                .bounds(this.layout.fieldX, 0, this.layout.fieldWidth, this.layout.fieldHeight)
+                .build();
+        addRow(PetPhraseLang.text("screen.petphrasex.config.remove_ignore_mark.desc"), toggle);
 
-        this.ignoreMarkField = this.addRenderableWidget(new EditBox(this.font, controlX, y, CONTROL_WIDTH, 20, Component.translatable("screen.petphrasex.config.ignore_mark")));
-        this.ignoreMarkField.setValue(config.ignoreMark);
-        y += ROW_HEIGHT;
+        this.prefixField = createField(config.prefix, "screen.petphrasex.config.prefix");
+        addRow(PetPhraseLang.text("screen.petphrasex.config.prefix.desc"), this.prefixField);
 
-        this.removeIgnoreMarkButton = this.addRenderableWidget(Button.builder(
-                this.getToggleText("screen.petphrasex.config.remove_ignore_mark", this.removeIgnoreMark),
-                button -> {
-                    this.removeIgnoreMark = !this.removeIgnoreMark;
-                    button.setMessage(this.getToggleText("screen.petphrasex.config.remove_ignore_mark", this.removeIgnoreMark));
-                }
-        ).bounds(controlX, y, CONTROL_WIDTH, 20).build());
-        y += ROW_HEIGHT;
+        this.suffixField = createField(config.suffix, "screen.petphrasex.config.suffix");
+        addRow(PetPhraseLang.text("screen.petphrasex.config.suffix.desc"), this.suffixField);
 
-        this.prefixField = this.addRenderableWidget(new EditBox(this.font, controlX, y, CONTROL_WIDTH, 20, Component.translatable("screen.petphrasex.config.prefix")));
-        this.prefixField.setValue(config.prefix);
-        y += ROW_HEIGHT;
+        this.sPrefixField = createField(config.sentencePrefix, "screen.petphrasex.config.sentence_prefix");
+        addRow(PetPhraseLang.text("screen.petphrasex.config.sentence_prefix.desc"), this.sPrefixField);
 
-        this.suffixField = this.addRenderableWidget(new EditBox(this.font, controlX, y, CONTROL_WIDTH, 20, Component.translatable("screen.petphrasex.config.suffix")));
-        this.suffixField.setValue(config.suffix);
-        y += ROW_HEIGHT;
+        this.sSuffixField = createField(config.sentenceSuffix, "screen.petphrasex.config.sentence_suffix");
+        addRow(PetPhraseLang.text("screen.petphrasex.config.sentence_suffix.desc"), this.sSuffixField);
 
-        this.sentencePrefixField = this.addRenderableWidget(new EditBox(this.font, controlX, y, CONTROL_WIDTH, 20, Component.translatable("screen.petphrasex.config.sentence_prefix")));
-        this.sentencePrefixField.setValue(config.sentencePrefix);
-        y += ROW_HEIGHT;
+        int buttonWidth = this.layout.buttonWidth();
+        int buttonHeight = this.layout.buttonHeight();
+        int buttonY = this.layout.buttonY();
+        int startX = this.layout.buttonStartX();
+        int gap = this.layout.buttonGap();
+        this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> this.save())
+                .bounds(startX, buttonY, buttonWidth, buttonHeight).build());
+        this.addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, button -> this.onClose())
+                .bounds(startX + buttonWidth + gap, buttonY, buttonWidth, buttonHeight).build());
+    }
 
-        this.sentenceSuffixField = this.addRenderableWidget(new EditBox(this.font, controlX, y, CONTROL_WIDTH, 20, Component.translatable("screen.petphrasex.config.sentence_suffix")));
-        this.sentenceSuffixField.setValue(config.sentenceSuffix);
+    private EditBox createField(String value, String narrationKey) {
+        EditBox box = new EditBox(this.font, this.layout.fieldX, 0, this.layout.fieldWidth, this.layout.fieldHeight,
+                PetPhraseLang.text(narrationKey));
+        box.setValue(value);
+        return box;
+    }
 
-        if (this.forcedByServer) {
-            this.enableClientPhraseButton.active = false;
-            this.ignoreMarkField.setEditable(false);
-            this.removeIgnoreMarkButton.active = false;
-            this.prefixField.setEditable(false);
-            this.suffixField.setEditable(false);
-            this.sentencePrefixField.setEditable(false);
-            this.sentenceSuffixField.setEditable(false);
+    private void addRow(Component label, AbstractWidget widget) {
+        int index = this.rows.size();
+        widget.setX(this.layout.fieldX);
+        widget.setY(this.layout.widgetY(index));
+        widget.setWidth(this.layout.fieldWidth);
+        widget.setHeight(this.layout.fieldHeight);
+        this.addRenderableWidget(widget);
+        this.rows.add(new Row(label, this.layout.labelY(index), !this.layout.inlineLabels));
+    }
 
-            this.reclaimButton = this.addRenderableWidget(Button.builder(
-                    Component.translatable("screen.petphrasex.config.reclaim"),
-                    button -> button.active = !ServerFeatureHooks.sendReclaimRequest()
-            ).bounds(panelX, this.height - 64, PANEL_WIDTH, 20).build());
-        }
+    private void save() {
+        PetPhraseConfigX config = PetPhraseConfigX.get();
+        config.ignoreMark = this.ignoreMarkField.getValue();
+        config.removeIgnoreMark = this.removeIgnoreMark;
+        config.prefix = this.prefixField.getValue();
+        config.suffix = this.suffixField.getValue();
+        config.sentencePrefix = this.sPrefixField.getValue();
+        config.sentenceSuffix = this.sSuffixField.getValue();
+        PetPhraseConfigX.save();
 
-        this.doneButton = this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> this.save())
-                .bounds(this.width / 2 - 104, this.height - 32, 100, 20)
-                .build());
-        this.cancelButton = this.addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, button -> this.onClose())
-                .bounds(this.width / 2 + 4, this.height - 32, 100, 20)
-                .build());
-
-        this.setInitialFocus(this.ignoreMarkField);
+        this.onClose();
     }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         super.extractRenderState(graphics, mouseX, mouseY, delta);
 
-        int panelX = (this.width - PANEL_WIDTH) / 2;
-        int labelX = panelX;
-        int y = this.forcedByServer ? 69 : 53;
-        int color = 0xFFA0A0A0;
+        int titleY = Math.max(4, (ConfigScreenLayout.HEADER_HEIGHT - ConfigScreenLayout.LABEL_LINE_HEIGHT) / 2);
+        // 26.x 的文字颜色是 ARGB：alpha 为 0 时 text() 会直接跳过绘制，必须带 0xFF 前缀
+        graphics.text(this.font, this.title.getVisualOrderText(),
+                Math.max(4, (this.width - this.font.width(this.title)) / 2), titleY, 0xFFFFFFFF, true);
 
-        graphics.centeredText(this.font, this.title, this.width / 2, 16, 0xFFFFFFFF);
-        if (this.forcedByServer) {
-            graphics.centeredText(
-                    this.font,
-                    Component.translatable("screen.petphrasex.config.forced_warning").withStyle(ChatFormatting.RED),
-                    this.width / 2,
-                    32,
-                    0xFFFF5555
-            );
+        int labelColor = 0xFFA0A0A0;
+        for (Row row : this.rows) {
+            if (row.centered) {
+                int x = Math.max(4, (this.width - this.font.width(row.label)) / 2);
+                graphics.text(this.font, row.label, x, row.labelY, labelColor, true);
+            } else {
+                // 緊湊版面：標籤只取一行，超出欄寬時截斷並補省略號，避免壓到輸入框
+                int maxWidth = Math.max(16, this.layout.labelWidth);
+                String text = row.label.getString();
+                if (this.font.width(text) > maxWidth) {
+                    String ellipsis = "…";
+                    text = this.font.plainSubstrByWidth(text, maxWidth - this.font.width(ellipsis)) + ellipsis;
+                }
+                graphics.text(this.font, Component.literal(text), this.layout.labelX, row.labelY, labelColor, true);
+            }
         }
-
-        graphics.text(this.font, Component.literal("客户端口癖"), labelX, y, color, true);
-        y += ROW_HEIGHT;
-        graphics.text(this.font, Component.translatable("screen.petphrasex.config.ignore_mark"), labelX, y, color, true);
-        y += ROW_HEIGHT;
-        graphics.text(this.font, Component.translatable("screen.petphrasex.config.remove_ignore_mark"), labelX, y, color, true);
-        y += ROW_HEIGHT;
-        graphics.text(this.font, Component.translatable("screen.petphrasex.config.prefix"), labelX, y, color, true);
-        y += ROW_HEIGHT;
-        graphics.text(this.font, Component.translatable("screen.petphrasex.config.suffix"), labelX, y, color, true);
-        y += ROW_HEIGHT;
-        graphics.text(this.font, Component.translatable("screen.petphrasex.config.sentence_prefix"), labelX, y, color, true);
-        y += ROW_HEIGHT;
-        graphics.text(this.font, Component.translatable("screen.petphrasex.config.sentence_suffix"), labelX, y, color, true);
     }
 
-    private Component getToggleText(String key, boolean enabled) {
-        return Component.translatable(key + ".button", Component.translatable(enabled ? "options.on" : "options.off"));
-    }
-
-    private void save() {
-        PetPhraseConfigX config = PetPhraseConfigX.get();
-        config.enableClientPhrase = this.enableClientPhrase;
-        config.applyPhraseSettings(new PhraseSettings(
-                this.ignoreMarkField.getValue(),
-                this.removeIgnoreMark,
-                this.prefixField.getValue(),
-                this.suffixField.getValue(),
-                this.sentencePrefixField.getValue(),
-                this.sentenceSuffixField.getValue()
-        ));
-        PetPhraseConfigX.save();
-        this.closeToParent();
+    private Component getRemoveIgnoreMarkButtonText(boolean removeIgnoreMark) {
+        return PetPhraseLang.text("screen.petphrasex.config.remove_ignore_mark.button",
+                I18n.get(removeIgnoreMark ? "options.on" : "options.off"));
     }
 
     @Override
     public void onClose() {
-        this.closeToParent();
-    }
-
-    private void closeToParent() {
-        if (this.minecraft != null) {
-            this.minecraft.setScreen(this.parent);
-        }
+        // 26.2 起屏幕切换从 Minecraft.setScreen 移到 Gui.setScreen
+        if (this.minecraft != null) this.minecraft.gui.setScreen(this.parent);
     }
 }
